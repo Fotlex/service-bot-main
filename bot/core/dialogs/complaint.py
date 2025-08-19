@@ -1,6 +1,11 @@
+import aiohttp
+import json
+import io
+import base64
+
 from aiogram import Router, Bot
 from aiogram.enums import ParseMode, ContentType
-from aiogram.types import Message, CallbackQuery, FSInputFile
+from aiogram.types import Message, CallbackQuery, FSInputFile, PhotoSize, Document
 from aiogram_dialog import Dialog, DialogManager, Window, StartMode, ShowMode
 from aiogram_dialog.api.entities import MediaAttachment, MediaId
 from aiogram_dialog.widgets.input import TextInput, MessageInput
@@ -9,6 +14,7 @@ from aiogram_dialog.widgets.media import DynamicMedia
 from aiogram_dialog.widgets.text import Const, Format
 from asgiref.sync import sync_to_async
 
+from config import config
 from bot.core.states import MainSG, ConditionerSG, CompanySG, ComplaintSG, YesDealerSG, NoDealerSG
 from web.panel.models import Settings, User
 
@@ -37,10 +43,55 @@ async def get_act_data(*args, **kwargs):
     return {'act': act_file}
 
 
+async def get_lead_fields():
+    async with aiohttp.ClientSession() as session:
+        method = "crm.lead.fields.json" # Метод для получения всех полей Лида
+        url = config.BITRIX24_WEBHOOK_URL + method
+
+        print(f"Отправляем запрос на: {url}")
+        try:
+            async with session.post(url) as response:
+                response.raise_for_status() # Вызовет ошибку для статусов 4xx/5xx
+                data = await response.json()
+
+                if data and 'result' in data:
+                    print("Поля Лида успешно получены:")
+                    for field_code, field_info in data['result'].items():
+                        # Ищем пользовательские поля (UF_CRM_) и наше поле "Файл из Telegram"
+                        if field_code.startswith('UF_CRM_') or field_info.get('title') == 'Файл из Telegram':
+                            print(f"  Код поля: {field_code}, Название: '{field_info.get('title')}', Тип: '{field_info.get('type')}'")
+                            if field_info.get('title') == 'Файл из Telegram' and field_info.get('type') == 'file':
+                                print(f"!!! НАЙДЕН НУЖНЫЙ ID ПОЛЯ: {field_code} !!!")
+                                return field_code # Возвращаем ID, если нашли
+                    print("\nПоле 'Файл из Telegram' типа 'Файл' не найдено среди пользовательских полей.")
+                    print("Возможно, оно имеет другое название или тип.")
+                elif data and 'error' in data:
+                    print(f"Ошибка Битрикс24: {data['error']} - {data['error_description']}")
+                else:
+                    print(f"Неизвестный ответ: {data}")
+
+        except aiohttp.ClientError as e:
+            print(f"Ошибка HTTP-запроса: {e}")
+        except json.JSONDecodeError as e:
+            print(f"Ошибка декодирования JSON: {e}")
+        except Exception as e:
+            print(f"Непредвиденная ошибка: {e}")
+    return None
+
+
 async def on_act(message: Message, widget, manager: DialogManager):
     user: User = manager.middleware_data['user']
     bot: Bot = manager.middleware_data['bot']
     manager_id = (await sync_to_async(Settings.get_solo)()).manager_id
+
+    company_name = user.company_name or "Не указано"
+    company_address = user.company_address or "Не указано"
+    fio = user.fio or "Не указано"
+    phone_number = user.phone_number or "Не указано"
+    email = user.email or "Не указано"
+    object_address = user.data.get('object_address', "Не указано")
+    object_name = user.data.get('object_name', "Не указано")
+    complaint_text = manager.dialog_data.get('complaint_text', "")
 
     text = f'''
 <b>Новая заявка: монтажная компания, дилер, акт</b>
@@ -63,6 +114,82 @@ async def on_act(message: Message, widget, manager: DialogManager):
 
     await message.forward(chat_id=manager_id)
 
+    bitrix_payload = {
+        "fields": {
+            "TITLE": f"Заявка из Telegram: {fio} ({company_name})",
+            "NAME": fio.split()[0] if fio and len(fio.split()) > 0 else "",
+            "LAST_NAME": fio.split()[-1] if fio and len(fio.split()) > 1 else "",
+            "COMPANY_TITLE": company_name,
+            "PHONE": [{"VALUE": phone_number, "VALUE_TYPE": "WORK"}],
+            "EMAIL": [{"VALUE": email, "VALUE_TYPE": "WORK"}],
+            "SOURCE_ID": "TELEGRAM", 
+            "COMMENTS": f"Адрес объекта: {object_address}\nНазвание объекта: {object_name}\nОбращение: {complaint_text}",
+            "OPENED": "Y",
+            "STATUS_ID": "NEW",
+        },
+        "params": {"REGISTER_SONET_EVENT": "Y"}
+    }
+    
+    file_for_bitrix = None
+    if message.photo or message.document:
+        try:
+            if message.photo:
+                file_id = message.photo[-1].file_id 
+                file_info = await bot.get_file(file_id)
+                file_name = file_info.file_path.split('/')[-1] if file_info.file_path else "photo.jpg"
+            else: 
+                file_id = message.document.file_id
+                file_info = await bot.get_file(file_id)
+                file_name = message.document.file_name
+
+            
+            file_content_io = io.BytesIO()
+            await bot.download_file(file_info.file_path, destination=file_content_io)
+            
+            encoded_content = base64.b64encode(file_content_io.getvalue()).decode('utf-8')
+            
+            file_for_bitrix = [file_name, encoded_content]
+            print(f"Файл '{file_name}' подготовлен для загрузки в Битрикс24.")
+
+        except Exception as e:
+            print(f"!!! ОШИБКА при подготовке файла для Битрикс24: {e}")
+            file_for_bitrix = None
+
+    if file_for_bitrix:
+        bitrix_payload["fields"]["UF_CRM_1755617658"] = {"fileData": file_for_bitrix}
+        print("Файл добавлен в payload Лида.")
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            method = "crm.lead.add.json"
+            lead_creation_url = config.BITRIX24_WEBHOOK_URL + method
+            
+            async with session.post(lead_creation_url, json=bitrix_payload) as response:
+                response.raise_for_status()
+                bitrix_result = await response.json()
+
+            if bitrix_result.get('result'):
+                lead_id = bitrix_result['result']
+                print(f"Лид успешно создан в Битрикс24. ID Лида: {lead_id}")
+                if file_for_bitrix:
+                    print("Файл успешно прикреплен к лиду через пользовательское поле.")
+            elif bitrix_result.get('error'):
+                error_desc = bitrix_result.get('error_description', 'Нет описания')
+                print(f"Ошибка Битрикс24 при создании Лида: {bitrix_result['error']} - {error_desc}")
+            else:
+                print(f"Неизвестный ответ от Битрикс24 при создании Лида: {bitrix_result}")
+
+    except aiohttp.ClientError as e:
+        print(f"!!! ОШИБКА HTTP-запроса к Битрикс24 при создании Лида: {e}")
+    except json.JSONDecodeError as e:
+        try:
+            error_response_text = await response.text()
+        except Exception:
+            error_response_text = "Не удалось получить текст ответа"
+        print(f"!!! ОШИБКА декодирования JSON ответа от Битрикс24 при создании Лида: {e}. Ответ: {error_response_text}")
+    except Exception as e:
+        print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24: {e}") 
+    
     await message.answer(f"Ваш запрос в работе. Менеджер сервиса ответит вам в ближайшее время.")
     await manager.start(state=MainSG.main)
 

@@ -19,6 +19,8 @@ class Config(BaseSettings):
 
     REDIS_HOST: str
     REDIS_PORT: str
+    
+    BITRIX24_WEBHOOK_URL: str
 
     class Config:
         env_file = ".env"
