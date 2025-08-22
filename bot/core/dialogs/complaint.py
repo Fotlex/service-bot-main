@@ -3,7 +3,10 @@ import json
 import io
 import base64
 
-from aiogram import Router, Bot
+from aiogram.fsm.context import FSMContext
+from aiogram.types import (InlineKeyboardButton, InlineKeyboardMarkup,
+                           ReplyKeyboardMarkup, KeyboardButton)
+from aiogram import Router, Bot, F
 from aiogram.enums import ParseMode, ContentType
 from aiogram.types import Message, CallbackQuery, FSInputFile, PhotoSize, Document
 from aiogram_dialog import Dialog, DialogManager, Window, StartMode, ShowMode
@@ -15,7 +18,7 @@ from aiogram_dialog.widgets.text import Const, Format
 from asgiref.sync import sync_to_async
 
 from config import config
-from bot.core.states import MainSG, ConditionerSG, CompanySG, ComplaintSG, YesDealerSG, NoDealerSG
+from bot.core.states import *
 from web.panel.models import Settings, User
 
 router = Router()
@@ -106,17 +109,25 @@ async def on_act(message: Message, widget, manager: DialogManager):
 Название объекта: {user.data['object_name']}
 <i>Обращение:</i>
 '''
+    user_id_to_reply = user.id
+
+    reply_callback_data = f"answer_user:{user_id_to_reply}"
+
     await bot.send_message(
         chat_id=manager_id,
         text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Ответить на вопрос", callback_data=reply_callback_data)],
+        ]),
         parse_mode=ParseMode.HTML,
     )
+
 
     await message.forward(chat_id=manager_id)
 
     bitrix_payload = {
         "fields": {
-            "TITLE": f"Заявка из Telegram: {fio} ({company_name})",
+            "TITLE": f"Заявка из Telegram: Дилер, Акт о неисправности",
             "NAME": fio.split()[0] if fio and len(fio.split()) > 0 else "",
             "LAST_NAME": fio.split()[-1] if fio and len(fio.split()) > 1 else "",
             "COMPANY_TITLE": company_name,
@@ -126,6 +137,7 @@ async def on_act(message: Message, widget, manager: DialogManager):
             "COMMENTS": f"Адрес объекта: {object_address}\nНазвание объекта: {object_name}\nОбращение: {complaint_text}",
             "OPENED": "Y",
             "STATUS_ID": "NEW",
+            "UF_CRM_1755788093": str(user.id),
         },
         "params": {"REGISTER_SONET_EVENT": "Y"}
     }
@@ -171,6 +183,9 @@ async def on_act(message: Message, widget, manager: DialogManager):
             if bitrix_result.get('result'):
                 lead_id = bitrix_result['result']
                 print(f"Лид успешно создан в Битрикс24. ID Лида: {lead_id}")
+                
+                user.bitrix_lead_id = lead_id
+                await user.asave()
                 if file_for_bitrix:
                     print("Файл успешно прикреплен к лиду через пользовательское поле.")
             elif bitrix_result.get('error'):
@@ -192,6 +207,184 @@ async def on_act(message: Message, widget, manager: DialogManager):
     
     await message.answer(f"Ваш запрос в работе. Менеджер сервиса ответит вам в ближайшее время.")
     await manager.start(state=MainSG.main)
+
+
+@router.message(QuestionSG.question_text)
+async def handle_user_question(message: Message, dialog_manager: DialogManager):
+    user_question_text = message.text
+    user: User = await sync_to_async(User.objects.get)(id=message.from_user.id)
+    bot: Bot = dialog_manager.middleware_data['bot']
+    manager_id = (await sync_to_async(Settings.get_solo)()).manager_id
+
+    if not user.bitrix_lead_id:
+        await message.answer("Извините, не могу найти связанный Лид для вашего вопроса. Пожалуйста, начните новую заявку.")
+        await dialog_manager.start(MainSG.main)
+        return
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            add_comment_url = f"{config.BITRIX24_WEBHOOK_URL}crm.comment.add.json"
+            comment_payload = {
+                "fields": {
+                    "ENTITY_ID": user.bitrix_lead_id,
+                    "ENTITY_TYPE": "lead",
+                    "COMMENT": f"Вопрос от пользователя Telegram ({user.fio}): {user_question_text}"
+                }
+            }
+            print(f"Отправляем комментарий в Битрикс24: {comment_payload}")
+            async with session.post(add_comment_url, json=comment_payload) as comment_response:
+                comment_response.raise_for_status()
+                comment_result = await comment_response.json()
+                if comment_result.get('result'):
+                    print(f"Вопрос пользователя успешно добавлен к Лиду {user.bitrix_lead_id} как комментарий.")
+                    await message.answer("Ваш вопрос передан менеджеру. Ожидайте ответа.")
+
+                    # Пересылаем вопрос пользователя менеджеру
+                    if manager_id != -1:
+                        await bot.send_message(
+                            chat_id=manager_id,
+                            text=f"Новый вопрос от пользователя (ID:{user.id}, Лид ID:{user.bitrix_lead_id}):"
+                        )
+                        await message.forward(chat_id=manager_id)
+                    else:
+                        print("Manager ID is not set or invalid. Cannot forward user question.")
+
+                else:
+                    error_desc = comment_result.get('error_description', 'Нет описания')
+                    print(f"Ошибка Битрикс24 при добавлении комментария пользователя: {comment_result['error']} - {error_desc}")
+                    await message.answer("Произошла ошибка при отправке вашего вопроса. Попробуйте позже.")
+
+    except Exception as e:
+        print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при добавлении комментария пользователя в Битрикс24: {e}")
+        await message.answer("Произошла непредвиденная ошибка. Попробуйте позже.")
+
+    await dialog_manager.start(MainSG.main) # Возвращаем пользователя в главное меню или другое подходящее состояние
+
+
+global_manager_id = None
+async def init_global_manager_id():
+    global global_manager_id
+    if global_manager_id is None:
+        try:
+            settings = await sync_to_async(Settings.objects.get)(pk=1)
+            global_manager_id = settings.manager_id
+            print(f"Global manager ID initialized: {global_manager_id}")
+        except Settings.DoesNotExist:
+            print("Settings object not found. Please create one in Django admin.")
+            global_manager_id = -1 # Fallback to an invalid ID
+        except Exception as e:
+            print(f"Error initializing global manager ID: {e}. Ensure manager_id is set.")
+            global_manager_id = -1 # Fallback to an invalid ID
+
+
+@router.callback_query(F.data.startswith('answer_user:'))
+async def ask_manager_for_reply(callback: CallbackQuery, dialog_manager: DialogManager):
+    user_id = int(callback.data.split(':')[1])
+
+    
+    await callback.message.edit_reply_markup(reply_markup=None)
+    
+    await dialog_manager.start(
+        state=ManagerReplySG.text_input, 
+        data={'user_id_to_reply': user_id},
+        mode=StartMode.RESET_STACK
+    )
+    await callback.answer()
+
+
+
+
+async def handle_manager_reply_dialog(message: Message, widget: TextInput, dialog_manager: DialogManager):
+    start_data = dialog_manager.start_data
+    original_telegram_user_id = start_data.get('user_id_to_reply')
+    
+    manager_id = message.from_user.id
+    bot = dialog_manager.middleware_data['bot']
+
+    if not original_telegram_user_id:
+        await message.answer("Произошла ошибка: не найден ID пользователя для ответа. Пожалуйста, начните снова.")
+        await dialog_manager.done()
+        return
+
+    try:
+        user: User = await sync_to_async(User.objects.get)(id=original_telegram_user_id)
+        if not user.bitrix_lead_id:
+            await bot.send_message(manager_id, "Ошибка: не удалось найти связанный Лид для этого пользователя.")
+            await dialog_manager.done()
+            return
+
+        lead_id = user.bitrix_lead_id
+        manager_reply_text = widget.get_value()
+
+        if manager_reply_text:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    add_comment_url = f"{config.BITRIX24_WEBHOOK_URL}crm.comment.add.json"
+                    comment_payload = {
+                        "fields": {
+                            "ENTITY_ID": lead_id,
+                            "ENTITY_TYPE": "lead",
+                            "COMMENT": f"Ответ менеджера в Telegram: {manager_reply_text}"
+                        }
+                    }
+                    async with session.post(add_comment_url, json=comment_payload) as comment_response:
+                        comment_response.raise_for_status()
+                        comment_result = await comment_response.json()
+                        if comment_result.get('result'):
+                            print(f"Текстовый ответ менеджера успешно добавлен к Лиду {lead_id} как комментарий.")
+                        else:
+                            error_desc = comment_result.get('error_description', 'Нет описания')
+                            print(f"Ошибка Битрикс24 при добавлении текстового комментария менеджера: {comment_result['error']} - {error_desc}")
+            except Exception as e:
+                print(f"!!! ОШИБКА при добавлении текстового комментария менеджера в Битрикс24: {e}")
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Понятно", callback_data="reply_understood"),
+                InlineKeyboardButton(text="Задать еще вопрос", callback_data="reply_ask_more")
+            ]
+        ])
+
+        await bot.send_message(
+            chat_id=original_telegram_user_id,
+            text=f"Ответ от менеджера:\n\n{manager_reply_text}",
+            reply_markup=keyboard
+        )
+
+        await bot.send_message(manager_id, f"Ответ отправлен пользователю {original_telegram_user_id} и сохранен в Лиде {lead_id}.")
+        
+    except Exception as e:
+        print(f"!!! ГЛОБАЛЬНАЯ ОШИБКА в handle_manager_reply_dialog для пользователя {original_telegram_user_id}: {e}")
+        await message.answer(f"Произошла непредвиденная ошибка при обработке вашего ответа: {e}")
+    finally:
+        await dialog_manager.done()
+
+
+
+
+# --- 4. Обработка кнопок пользователя ---
+@router.callback_query(F.data == "reply_understood")
+async def process_understood_callback(callback: CallbackQuery, dialog_manager: DialogManager, user: User):
+    user_id = callback.from_user.id
+    bot: Bot = dialog_manager.middleware_data['bot']
+    manager_id = global_manager_id
+
+    await callback.message.edit_reply_markup(reply_markup=None) # Убираем кнопки
+    await callback.message.answer("Рад был помочь! Если возникнут новые вопросы, обращайтесь.")
+    await callback.answer()
+
+
+    if user.bitrix_lead_id:
+        lead_id = user.bitrix_lead_id
+        
+        user.bitrix_lead_id = None
+        await user.asave()
+        
+    try:
+        await dialog_manager.start(MainSG.main)
+    except Exception as e: # Используем более общий Exception для aiogram-dialog.api.exceptions.NoActiveDialogError
+        print(f"Ошибка при попытке перейти в MainSG.main для пользователя {user_id}: {e}")
+        # Если диалога нет, просто отвечаем и ничего не делаем с dialog_manager
 
 
 async def yes_dealer_done(message: Message, button: Button, dialog_manager: DialogManager, text: str):
@@ -357,10 +550,25 @@ no_dealer_dialog = Dialog(
         Start(text=Const('Назад'), state=ComplaintSG.main, id='go_back'),
         state=NoDealerSG.message
     ),
+    
+    
 )
+
+manager_reply_dialog = Dialog(
+    Window(
+        Const("Введите ответ для пользователя:"),
+        TextInput(
+            id='manager_reply_text',
+            on_success=handle_manager_reply_dialog
+        ),
+        state=ManagerReplySG.text_input,
+    )
+)
+
 
 router.include_routers(
     dialog,
     yes_dealer_dialog,
-    no_dealer_dialog
+    no_dealer_dialog,
+    manager_reply_dialog,
 )

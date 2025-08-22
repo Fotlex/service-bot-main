@@ -31,6 +31,8 @@ class User(models.Model):
     email = models.CharField('Адрес электронной почты', null=True, blank=True)
 
     created_at = models.DateTimeField('Дата регистрации', auto_now_add=True, blank=True)
+    
+    bitrix_lead_id = models.IntegerField(blank=True, null=True)
 
     data = models.JSONField(default=dict, blank=True)
 

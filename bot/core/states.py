@@ -58,3 +58,12 @@ class YesDealerSG(StatesGroup):
     yes = State()
     no = State()
     main = State()
+
+
+class QuestionSG(StatesGroup):
+    question_text = State() 
+    answ_text = State()
+    
+    
+class ManagerReplySG(StatesGroup):
+    text_input = State()
