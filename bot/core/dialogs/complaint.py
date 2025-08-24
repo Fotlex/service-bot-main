@@ -48,24 +48,24 @@ async def get_act_data(*args, **kwargs):
 
 async def get_lead_fields():
     async with aiohttp.ClientSession() as session:
-        method = "crm.lead.fields.json" # Метод для получения всех полей Лида
+        method = "crm.lead.fields.json" 
         url = config.BITRIX24_WEBHOOK_URL + method
 
         print(f"Отправляем запрос на: {url}")
         try:
             async with session.post(url) as response:
-                response.raise_for_status() # Вызовет ошибку для статусов 4xx/5xx
+                response.raise_for_status() 
                 data = await response.json()
 
                 if data and 'result' in data:
                     print("Поля Лида успешно получены:")
                     for field_code, field_info in data['result'].items():
-                        # Ищем пользовательские поля (UF_CRM_) и наше поле "Файл из Telegram"
+                      
                         if field_code.startswith('UF_CRM_') or field_info.get('title') == 'Файл из Telegram':
                             print(f"  Код поля: {field_code}, Название: '{field_info.get('title')}', Тип: '{field_info.get('type')}'")
                             if field_info.get('title') == 'Файл из Telegram' and field_info.get('type') == 'file':
                                 print(f"!!! НАЙДЕН НУЖНЫЙ ID ПОЛЯ: {field_code} !!!")
-                                return field_code # Возвращаем ID, если нашли
+                                return field_code 
                     print("\nПоле 'Файл из Telegram' типа 'Файл' не найдено среди пользовательских полей.")
                     print("Возможно, оно имеет другое название или тип.")
                 elif data and 'error' in data:
@@ -134,7 +134,19 @@ async def on_act(message: Message, widget, manager: DialogManager):
             "PHONE": [{"VALUE": phone_number, "VALUE_TYPE": "WORK"}],
             "EMAIL": [{"VALUE": email, "VALUE_TYPE": "WORK"}],
             "SOURCE_ID": "TELEGRAM", 
-            "COMMENTS": f"Адрес объекта: {object_address}\nНазвание объекта: {object_name}\nОбращение: {complaint_text}",
+            "COMMENTS": f'''
+<b>Новая заявка: монтажная компания, дилер, акт</b>
+
+Название компании: {user.company_name}
+Адрес компании: {user.company_address}
+ФИО: {user.fio}
+Номер телефона: {user.phone_number}
+Электронная почта: {user.email}
+
+Адрес объекта: {user.data['object_address']}
+Название объекта: {user.data['object_name']}
+<i>Обращение:</i>
+''',
             "OPENED": "Y",
             "STATUS_ID": "NEW",
             "UF_CRM_1755788093": str(user.id),
@@ -280,22 +292,24 @@ async def init_global_manager_id():
             print(f"Global manager ID initialized: {global_manager_id}")
         except Settings.DoesNotExist:
             print("Settings object not found. Please create one in Django admin.")
-            global_manager_id = -1 # Fallback to an invalid ID
+            global_manager_id = -1 
         except Exception as e:
             print(f"Error initializing global manager ID: {e}. Ensure manager_id is set.")
-            global_manager_id = -1 # Fallback to an invalid ID
+            global_manager_id = -1 
 
 
 @router.callback_query(F.data.startswith('answer_user:'))
 async def ask_manager_for_reply(callback: CallbackQuery, dialog_manager: DialogManager):
     user_id = int(callback.data.split(':')[1])
-
+    parts = callback.data.split(':')
+    
+    is_final_reply = "is_final_reply=1" in parts
     
     await callback.message.edit_reply_markup(reply_markup=None)
     
     await dialog_manager.start(
         state=ManagerReplySG.text_input, 
-        data={'user_id_to_reply': user_id},
+        data={'user_id_to_reply': user_id, 'is_final_reply': is_final_reply,},
         mode=StartMode.RESET_STACK
     )
     await callback.answer()
@@ -306,6 +320,8 @@ async def ask_manager_for_reply(callback: CallbackQuery, dialog_manager: DialogM
 async def handle_manager_reply_dialog(message: Message, widget: TextInput, dialog_manager: DialogManager, text: str):
     start_data = dialog_manager.start_data
     original_telegram_user_id = start_data.get('user_id_to_reply')
+    
+    is_final_reply = start_data.get('is_final_reply', False)
     
     manager_id = message.from_user.id
     bot = dialog_manager.middleware_data['bot']
@@ -347,13 +363,20 @@ async def handle_manager_reply_dialog(message: Message, widget: TextInput, dialo
                             print(f"Ошибка Битрикс24 при добавлении текстового комментария менеджера: {comment_result['error']} - {error_desc}")
             except Exception as e:
                 print(f"!!! ОШИБКА при добавлении текстового комментария менеджера в Битрикс24: {e}")
-        
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(text="Понятно", callback_data="reply_understood"),
-                InlineKeyboardButton(text="Задать еще вопрос", callback_data="reply_ask_more")
-            ]
-        ])
+        keyboard = None
+        if is_final_reply:
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="Понятно", callback_data="reply_understood"),
+                ]
+            ])
+        else:
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="Понятно", callback_data="reply_understood"),
+                    InlineKeyboardButton(text="Задать еще вопрос", callback_data="reply_ask_more")
+                ]
+            ])
 
         await bot.send_message(
             chat_id=original_telegram_user_id,
@@ -377,16 +400,13 @@ async def process_ask_more_callback(callback: CallbackQuery, dialog_manager: Dia
     await callback.answer()
 
 
-
-
-# --- 4. Обработка кнопок пользователя ---
 @router.callback_query(F.data == "reply_understood")
 async def process_understood_callback(callback: CallbackQuery, dialog_manager: DialogManager, user: User):
     user_id = callback.from_user.id
     bot: Bot = dialog_manager.middleware_data['bot']
     manager_id = global_manager_id
 
-    await callback.message.edit_reply_markup(reply_markup=None) # Убираем кнопки
+    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer("Рад был помочь! Если возникнут новые вопросы, обращайтесь.")
     await callback.answer()
 
@@ -399,12 +419,12 @@ async def process_understood_callback(callback: CallbackQuery, dialog_manager: D
         
     try:
         await dialog_manager.start(MainSG.main)
-    except Exception as e: # Используем более общий Exception для aiogram-dialog.api.exceptions.NoActiveDialogError
+    except Exception as e: 
         print(f"Ошибка при попытке перейти в MainSG.main для пользователя {user_id}: {e}")
-        # Если диалога нет, просто отвечаем и ничего не делаем с dialog_manager
+        
 
 
-async def yes_dealer_done(message: Message, button: Button, dialog_manager: DialogManager, text: str):
+async def yes_dealer_done(message: Message, widget: TextInput, dialog_manager: DialogManager, text: str):
     user: User = dialog_manager.middleware_data['user']
     bot: Bot = dialog_manager.middleware_data['bot']
     manager_id = (await sync_to_async(Settings.get_solo)()).manager_id
@@ -415,6 +435,14 @@ async def yes_dealer_done(message: Message, button: Button, dialog_manager: Dial
     date = dialog_manager.find('date').get_value()
     error_code = dialog_manager.find('error_code').get_value() or dialog_manager.find('error_code1').get_value()
 
+    company_name = user.company_name or "Не указано"
+    company_address = user.company_address or "Не указано"
+    fio = user.fio or "Не указано"
+    phone_number = user.phone_number or "Не указано"
+    email = user.email or "Не указано"
+    object_address = user.data.get('object_address', "Не указано")
+    object_name = user.data.get('object_name', "Не указано")
+    
     text = f'''
 <b>Новая заявка: монтажная компания, дилер, без акта</b>
 
@@ -435,12 +463,86 @@ async def yes_dealer_done(message: Message, button: Button, dialog_manager: Dial
 Код ошибки: {error_code}
 Дата покупки оборудования или номер счета: {date}
     '''
+    reply_callback_data = f"answer_user:{user.id}"
+    
     await bot.send_message(
         chat_id=manager_id,
         text=text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Ответить на вопрос", callback_data=reply_callback_data)],
+        ]),
         parse_mode=ParseMode.HTML,
     )
 
+    bitrix_payload = {
+        "fields": {
+            "TITLE": f"Заявка из Telegram: Дилер, Без акта",
+            "NAME": fio.split()[0] if fio and len(fio.split()) > 0 else "",
+            "LAST_NAME": fio.split()[-1] if fio and len(fio.split()) > 1 else "",
+            "COMPANY_TITLE": company_name,
+            "PHONE": [{"VALUE": phone_number, "VALUE_TYPE": "WORK"}],
+            "EMAIL": [{"VALUE": email, "VALUE_TYPE": "WORK"}],
+            "SOURCE_ID": "TELEGRAM", 
+            "COMMENTS": f'''
+<b>Новая заявка: монтажная компания, дилер, без акта</b>
+
+Название компании: {user.company_name}
+Адрес компании: {user.company_address}
+ФИО: {user.fio}
+Номер телефона: {user.phone_number}
+Электронная почта: {user.email}
+
+Адрес объекта: {user.data['object_address']}
+Название объекта: {user.data['object_name']}
+
+Марка и модель кондиционера: {brand}
+Что делали:
+{what_do or 'Ничего'}
+Результаты диагностики:
+{diagnostic_results or 'Ничего'}
+Код ошибки: {error_code}
+Дата покупки оборудования или номер счета: {date}
+    ''',
+            "OPENED": "Y",
+            "STATUS_ID": "NEW",
+            "UF_CRM_1755788093": str(user.id),
+        },
+        "params": {"REGISTER_SONET_EVENT": "Y"}
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            method = "crm.lead.add.json"
+            lead_creation_url = config.BITRIX24_WEBHOOK_URL + method
+            
+            async with session.post(lead_creation_url, json=bitrix_payload) as response:
+                response.raise_for_status()
+                bitrix_result = await response.json()
+
+            if bitrix_result.get('result'):
+                lead_id = bitrix_result['result']
+                print(f"Лид успешно создан в Битрикс24. ID Лида: {lead_id}")
+                
+                user.bitrix_lead_id = lead_id
+                await user.asave()
+                
+            elif bitrix_result.get('error'):
+                error_desc = bitrix_result.get('error_description', 'Нет описания')
+                print(f"Ошибка Битрикс24 при создании Лида: {bitrix_result['error']} - {error_desc}")
+            else:
+                print(f"Неизвестный ответ от Битрикс24 при создании Лида: {bitrix_result}")
+
+    except aiohttp.ClientError as e:
+        print(f"!!! ОШИБКА HTTP-запроса к Битрикс24 при создании Лида: {e}")
+    except json.JSONDecodeError as e:
+        try:
+            error_response_text = await response.text()
+        except Exception:
+            error_response_text = "Не удалось получить текст ответа"
+        print(f"!!! ОШИБКА декодирования JSON ответа от Битрикс24 при создании Лида: {e}. Ответ: {error_response_text}")
+    except Exception as e:
+        print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24: {e}") 
+    
     await message.answer(f"Ваш запрос в работе. Менеджер сервиса ответит вам в ближайшее время.")
 
     await dialog_manager.start(state=MainSG.main, mode=StartMode.RESET_STACK)
@@ -519,6 +621,94 @@ yes_dealer_dialog = Dialog(
 )
 
 
+async def send_service_center_request(callback: CallbackQuery, button: Button, manager: DialogManager):
+    user: User = manager.middleware_data['user']
+    bot: Bot = manager.middleware_data['bot']
+    manager_id = global_manager_id
+
+    company_name = user.company_name or "Не указано"
+    company_address = user.company_address or "Не указано"
+    fio = user.fio or "Не указано"
+    phone_number = user.phone_number or "Не указано"
+    email = user.email or "Не указано"
+    object_address = user.data.get('object_address', "Не указано")
+    object_name = user.data.get('object_name', "Не указано")
+
+    brand_input = manager.find('brand').get_value()
+    if not brand_input:
+        brand_input = "Не указано (нет в списке моделей)"
+
+    text_to_manager = f'''
+<b>Новая заявка: Дилер - Запрос в сервисный центр (модель не найдена)</b>
+
+Название компании: {user.company_name}
+Адрес компании: {user.company_address}
+ФИО: {user.fio}
+Номер телефона: {user.phone_number}
+Электронная почта: {user.email}
+
+Адрес объекта: {user.data['object_address']}
+Название объекта: {user.data['object_name']}
+
+Марка/модель (которую искали): {brand_input}
+<i>Запрос: Модель не найдена в списке, требуется отправить запрос по рекламации в сервисный центр.</i>
+'''
+    if manager_id != -1:
+        await bot.send_message(
+            chat_id=manager_id,
+            text=text_to_manager,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Ответить на вопрос", callback_data=f"answer_user:{user.id}")],
+            ]),
+        )
+    else:
+        print("Manager ID is not set or invalid. Cannot send message to manager (service center request).")
+
+    await callback.message.answer(f"Ваш запрос для сервисного центра принят. Менеджер свяжется с вами.")
+    await callback.answer()
+
+
+    bitrix_payload = {
+        "fields": {
+            "TITLE": f"Запрос СЦ (модель нет в списке)",
+            "NAME": fio.split()[0] if fio and len(fio.split()) > 0 else "",
+            "LAST_NAME": fio.split()[-1] if fio and len(fio.split()) > 1 else "",
+            "COMPANY_TITLE": company_name,
+            "PHONE": [{"VALUE": phone_number, "VALUE_TYPE": "WORK"}],
+            "EMAIL": [{"VALUE": email, "VALUE_TYPE": "WORK"}],
+            "SOURCE_ID": "TELEGRAM",
+            "COMMENTS": text_to_manager,
+            "OPENED": "Y",
+            "STATUS_ID": "NEW",
+            "UF_CRM_1755788093": str(user.id),
+        },
+        "params": {"REGISTER_SONET_EVENT": "Y"}
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            lead_creation_url = config.BITRIX24_WEBHOOK_URL + "crm.lead.add.json"
+            async with session.post(lead_creation_url, json=bitrix_payload) as response:
+                response.raise_for_status()
+                bitrix_result = await response.json()
+
+            if bitrix_result.get('result'):
+                lead_id = bitrix_result['result']
+                print(f"Лид для запроса в СЦ успешно создан. ID Лида: {lead_id}")
+                user.bitrix_lead_id = lead_id 
+                await user.asave()
+            elif bitrix_result.get('error'):
+                error_desc = bitrix_result.get('error_description', 'Нет описания')
+                print(f"Ошибка Битрикс24 при создании Лида для запроса в СЦ: {bitrix_result['error']} - {error_desc}")
+            else:
+                print(f"Неизвестный ответ от Битрикс24 при создании Лида для запроса в СЦ: {bitrix_result}")
+    except Exception as e:
+        print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24 (запрос СЦ): {e}")
+
+    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK) 
+
+
 async def no_message_handler(message: Message, message_input: MessageInput, manager: DialogManager):
     conditioner_brand = manager.find('input').get_value()
     manager_id = (await sync_to_async(Settings.get_solo)()).manager_id
@@ -526,6 +716,14 @@ async def no_message_handler(message: Message, message_input: MessageInput, mana
     user: User = manager.middleware_data['user']
     bot: Bot = manager.middleware_data['bot']
 
+    company_name = user.company_name or "Не указано"
+    company_address = user.company_address or "Не указано"
+    fio = user.fio or "Не указано"
+    phone_number = user.phone_number or "Не указано"
+    email = user.email or "Не указано"
+    object_address = user.data.get('object_address', "Не указано")
+    object_name = user.data.get('object_name', "Не указано")
+    
     text = f'''
 <b>Новая заявка: монтажная компания, не дилер</b>
 
@@ -539,15 +737,80 @@ async def no_message_handler(message: Message, message_input: MessageInput, mana
 Название объекта: {user.data['object_name']}
 
 Марка и модель кондиционера: {conditioner_brand}
-<i>Обращение:</i>
+<i>Обращение: {message.text}</i>
 '''
     await bot.send_message(
         chat_id=manager_id,
         text=text,
         parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Ответить на вопрос", callback_data=f"answer_user:{user.id}:is_final_reply=1")],
+            ]),
     )
 
-    await message.forward(chat_id=manager_id)
+    bitrix_payload = {
+        "fields": {
+            "TITLE": f"Заявка из Telegram: Не дилер",
+            "NAME": fio.split()[0] if fio and len(fio.split()) > 0 else "",
+            "LAST_NAME": fio.split()[-1] if fio and len(fio.split()) > 1 else "",
+            "COMPANY_TITLE": company_name,
+            "PHONE": [{"VALUE": phone_number, "VALUE_TYPE": "WORK"}],
+            "EMAIL": [{"VALUE": email, "VALUE_TYPE": "WORK"}],
+            "SOURCE_ID": "TELEGRAM", 
+            "COMMENTS": f'''
+<b>Новая заявка: монтажная компания, не дилер</b>
+
+Название компании: {user.company_name}
+Адрес компании: {user.company_address}
+ФИО: {user.fio}
+Номер телефона: {user.phone_number}
+Электронная почта: {user.email}
+
+Адрес объекта: {user.data['object_address']}
+Название объекта: {user.data['object_name']}
+
+Марка и модель кондиционера: {conditioner_brand}
+<i>Обращение: {message.text}</i>
+''',
+            "OPENED": "Y",
+            "STATUS_ID": "NEW",
+            "UF_CRM_1755788093": str(user.id),
+        },
+        "params": {"REGISTER_SONET_EVENT": "Y"}
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            method = "crm.lead.add.json"
+            lead_creation_url = config.BITRIX24_WEBHOOK_URL + method
+            
+            async with session.post(lead_creation_url, json=bitrix_payload) as response:
+                response.raise_for_status()
+                bitrix_result = await response.json()
+
+            if bitrix_result.get('result'):
+                lead_id = bitrix_result['result']
+                print(f"Лид успешно создан в Битрикс24. ID Лида: {lead_id}")
+                
+                user.bitrix_lead_id = lead_id
+                await user.asave()
+                
+            elif bitrix_result.get('error'):
+                error_desc = bitrix_result.get('error_description', 'Нет описания')
+                print(f"Ошибка Битрикс24 при создании Лида: {bitrix_result['error']} - {error_desc}")
+            else:
+                print(f"Неизвестный ответ от Битрикс24 при создании Лида: {bitrix_result}")
+
+    except aiohttp.ClientError as e:
+        print(f"!!! ОШИБКА HTTP-запроса к Битрикс24 при создании Лида: {e}")
+    except json.JSONDecodeError as e:
+        try:
+            error_response_text = await response.text()
+        except Exception:
+            error_response_text = "Не удалось получить текст ответа"
+        print(f"!!! ОШИБКА декодирования JSON ответа от Битрикс24 при создании Лида: {e}. Ответ: {error_response_text}")
+    except Exception as e:
+        print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24: {e}") 
 
     await message.answer(f"Ваш запрос в работе. Менеджер сервиса ответит вам в ближайшее время.")
     await manager.start(state=ConditionerSG.main, mode=StartMode.RESET_STACK)

@@ -23,6 +23,7 @@ class ConditionerSG(StatesGroup):
 class CompanySG(StatesGroup):
     zapros = State()
     cond_error_code = State()
+    no_model_found_company = State()
     cond_model = State()
     cond_type = State()
     by_myself = State()
@@ -34,6 +35,12 @@ class CompanySG(StatesGroup):
     phone_input = State()
     address_input = State()
     main = State()
+    ask_for_more_errors = State()
+    
+    company_model_removed_date = State()
+    company_model_removed_model_name = State()
+    company_model_removed_barcode = State()
+    company_model_removed_error_code_input = State() 
 
 
 class ComplaintSG(StatesGroup):
@@ -58,6 +65,7 @@ class YesDealerSG(StatesGroup):
     yes = State()
     no = State()
     main = State()
+    no_model_found = State()
 
 
 class QuestionSG(StatesGroup):
