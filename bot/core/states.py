@@ -75,3 +75,9 @@ class QuestionSG(StatesGroup):
     
 class ManagerReplySG(StatesGroup):
     text_input = State()
+    
+    
+class FinalConsumerSG(StatesGroup):
+    choice = State() 
+    info_input = State() 
+    barcode = State()

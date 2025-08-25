@@ -6,7 +6,7 @@ from aiogram_dialog.widgets.kbd import Button, Row, Next, Back, SwitchTo, Scroll
 from aiogram_dialog.widgets.text import Const, Format
 from asgiref.sync import sync_to_async
 
-from bot.core.states import MainSG, ConditionerSG, CompanySG, ComplaintSG
+from bot.core.states import MainSG, ConditionerSG, CompanySG, ComplaintSG, FinalConsumerSG
 from web.panel.models import GreeModel, KitanoModel, RoverModel, ActualModel, ErrorCode
 
 import aiohttp
@@ -79,12 +79,100 @@ async def on_company(callback: CallbackQuery, button: Button, dialog_manager: Di
     await dialog_manager.start(state=CompanySG.main)
 
 
+async def on_final_consumer(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    await dialog_manager.start(state=FinalConsumerSG.choice, mode=StartMode.RESET_STACK)
+
+async def on_contact_myself(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    await callback.message.answer("Спасибо за обращение в нашу компанию!")
+    await callback.answer()
+    await dialog_manager.start(MainSG.main, mode=StartMode.RESET_STACK)
+
+
+async def save_consumer_info_handler(message: Message, widget: TextInput, dialog_manager: DialogManager, text: str):
+    dialog_manager.dialog_data['consumer_info'] = text
+    await dialog_manager.next()
+
+
+async def send_final_consumer_request(message: Message, message_input: MessageInput, manager: DialogManager):
+    user: User = manager.middleware_data['user']
+    bot: Bot = manager.middleware_data['bot']
+
+
+    consumer_info = manager.dialog_data.get('consumer_info', 'Не указано')
+    
+    file_for_bitrix = None
+    if message.photo:
+        try:
+            file_id = message.photo[-1].file_id
+            file_info = await bot.get_file(file_id)
+            file_name = file_info.file_path.split('/')[-1] if file_info.file_path else f"barcode_{file_id}.jpg"
+
+            file_content_io = io.BytesIO()
+            await bot.download_file(file_info.file_path, destination=file_content_io)
+            encoded_content = base64.b64encode(file_content_io.getvalue()).decode('utf-8')
+            file_for_bitrix = [file_name, encoded_content]
+            print(f"Фото штрихкода '{file_name}' подготовлено для загрузки в Битрикс24.")
+        except Exception as e:
+            print(f"!!! ОШИБКА при подготовке фото штрихкода для Битрикс24: {e}")
+            file_for_bitrix = None
+
+    fio_for_title = consumer_info.split(',')[0].strip() or "Не указано"
+    
+    text_to_manager_and_bitrix = f'''
+<b>Новая заявка: Конечный потребитель</b>
+
+Контактные данные (ФИО, телефон, email):
+{consumer_info}
+
+<i>Запрос: Пользователь оставил заявку, чтобы вы сами связались с компанией, у которой он приобрел оборудование. Фото штрихкода приложено.</i>
+'''
+    
+
+    await message.answer("Спасибо за обращение в нашу компанию, ваша заявка будет передана в ближайшее время.")
+    
+    bitrix_payload = {
+        "fields": {
+            "TITLE": f"Заявка от Конечного потребителя: {fio_for_title}",
+            "COMMENTS": text_to_manager_and_bitrix,
+            "OPENED": "Y",
+            "STATUS_ID": "NEW",
+            "UF_CRM_1755788093": str(user.id),
+        },
+        "params": {"REGISTER_SONET_EVENT": "Y"}
+    }
+    
+    if file_for_bitrix:
+        bitrix_payload["fields"]["UF_CRM_1755617658"] = {"fileData": file_for_bitrix}
+        print(f"Фото штрихкода добавлено в payload Лидa.")
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            lead_creation_url = config.BITRIX24_WEBHOOK_URL + "crm.lead.add.json"
+            async with session.post(lead_creation_url, json=bitrix_payload) as response:
+                response.raise_for_status()
+                bitrix_result = await response.json()
+
+                if bitrix_result.get('result'):
+                    lead_id = bitrix_result['result']
+                    print(f"Лид (Конечный потребитель) успешно создан. ID Лида: {lead_id}")
+                    user.bitrix_lead_id = lead_id
+                    await user.asave()
+                elif bitrix_result.get('error'):
+                    error_desc = bitrix_result.get('error_description', 'Нет описания')
+                    print(f"Ошибка Битрикс24 при создании Лида (Конечный потребитель): {bitrix_result['error']} - {error_desc}")
+                else:
+                    print(f"Неизвестный ответ от Битрикс24 при создании Лида (Конечный потребитель): {bitrix_result}")
+    except Exception as e:
+        print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24 (Конечный потребитель): {e}")
+
+    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK)
+
+
+
 main_window = Window(
     Const(text='Кем вы являетесь?'),
     Button(Const(text='Климатическая компания/монтажная организация'), id='company', on_click=on_company),
-    Row(
-        Back(text=Const('Конечный потребитель')),
-    ),
+    Button(Const(text='Конечный потребитель'), id='final_consumer', on_click=on_final_consumer),
     Button(Const(text='Назад в меню'), id='menu', on_click=go_to_menu),
     state=ConditionerSG.main
 )
@@ -104,6 +192,9 @@ dialog = Dialog(
 )
 
 router.include_router(dialog)
+
+
+
 
 
 async def on_text_input_success(message: Message, widget: TextInput, dialog_manager: DialogManager, text: str):
@@ -461,4 +552,29 @@ company_dialog = Dialog(
     )
 )
 
-router.include_router(company_dialog)
+final_consumer_dialog = Dialog(
+    Window(
+        Const('Если у вас не работает кондиционер, вы можете обратиться в компанию у которой вы приобретали оборудование или оставить заявку в нашем сервисе и мы сами свяжемся с компанией у которой вы приобрели оборудование.'),
+        Row(
+            Button(Const('Свяжусь сам'), id='contact_myself', on_click=on_contact_myself),
+            Next(text=Const('Оставлю заявку вам'), id='leave_request'),
+        ),
+        Start(text=Const("Назад"), state=ConditionerSG.main, id="back_to_conditioner_main", mode=StartMode.RESET_STACK),
+        state=FinalConsumerSG.choice,
+    ),
+    Window(
+        Const('Укажите ваше ФИО, номер телефона для связи и адрес электронной почты.'),
+        Back(text=Const('Назад')),
+        TextInput(id='final_consumer_info_input', on_success=save_consumer_info_handler),
+        state=FinalConsumerSG.info_input,
+    ),
+    Window(
+        Const('Пожалуйста, приложите фото штрих-кода с оборудования, которое вышло из строя.'),
+        Back(text=Const('Назад')),
+        MessageInput(send_final_consumer_request, content_types=ContentType.PHOTO),
+        state=FinalConsumerSG.barcode,
+    ),
+)
+
+
+router.include_routers(company_dialog, final_consumer_dialog)
