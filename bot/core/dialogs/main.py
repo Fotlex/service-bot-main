@@ -26,7 +26,7 @@ async def on_conditioner_click(callback: CallbackQuery, button: Button, dialog_m
 
 
 main_window = Window(
-    Const(text='Главная страница'),
+    Const(text='ГЛАВНАЯ СТРАНИЦА'),
     Row(
         Button(text=Const('Стать дилером'), id='be_a_dealer', on_click=on_dealer_click),
         Button(text=Const('Не работает кондиционер'), id='conditioner_broken', on_click=on_conditioner_click),

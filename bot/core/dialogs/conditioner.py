@@ -413,7 +413,7 @@ async def final_thanks_company(callback: CallbackQuery, button: Button, manager:
     await callback.message.answer(text='Спасибо за обращение в нашу компанию!')
     await callback.answer()
 
-    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK)
+    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
 
 
 async def on_no_error_in_list(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):

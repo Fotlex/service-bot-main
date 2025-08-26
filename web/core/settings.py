@@ -9,6 +9,8 @@ DEBUG = config.DEBUG
 
 ALLOWED_HOSTS = config.DJANGO_ALLOWED_HOSTS
 
+CSRF_TRUSTED_ORIGINS = config.CSRF_TRUSTED_ORIGINS
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',

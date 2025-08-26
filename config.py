@@ -10,6 +10,7 @@ class Config(BaseSettings):
     TIMEZONE: str
 
     DJANGO_ALLOWED_HOSTS: list[str]
+    CSRF_TRUSTED_ORIGINS: list[str]
 
     DB_NAME: str
     DB_USER: str

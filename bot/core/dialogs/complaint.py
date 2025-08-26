@@ -418,7 +418,7 @@ async def process_understood_callback(callback: CallbackQuery, dialog_manager: D
         await user.asave()
         
     try:
-        await dialog_manager.start(MainSG.main)
+        await dialog_manager.start(state=MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
     except Exception as e: 
         print(f"Ошибка при попытке перейти в MainSG.main для пользователя {user_id}: {e}")
         
