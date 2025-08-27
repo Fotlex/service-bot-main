@@ -92,8 +92,7 @@ async def on_act(message: Message, widget, manager: DialogManager):
     fio = user.fio or "Не указано"
     phone_number = user.phone_number or "Не указано"
     email = user.email or "Не указано"
-    object_address = user.data.get('object_address', "Не указано")
-    object_name = user.data.get('object_name', "Не указано")
+    object_info = user.data.get('object_info', "Не указано")
     complaint_text = manager.dialog_data.get('complaint_text', "")
 
     text = f'''
@@ -105,8 +104,7 @@ async def on_act(message: Message, widget, manager: DialogManager):
 Номер телефона: {user.phone_number}
 Электронная почта: {user.email}
 
-Адрес объекта: {user.data['object_address']}
-Название объекта: {user.data['object_name']}
+Адрес и название объекта: {object_info}
 <i>Обращение:</i>
 '''
     user_id_to_reply = user.id
@@ -143,8 +141,7 @@ async def on_act(message: Message, widget, manager: DialogManager):
 Номер телефона: {user.phone_number}
 Электронная почта: {user.email}
 
-Адрес объекта: {user.data['object_address']}
-Название объекта: {user.data['object_name']}
+Адрес и название объекта: {object_info}
 <i>Обращение:</i>
 ''',
             "OPENED": "Y",
@@ -440,8 +437,7 @@ async def yes_dealer_done(message: Message, widget: TextInput, dialog_manager: D
     fio = user.fio or "Не указано"
     phone_number = user.phone_number or "Не указано"
     email = user.email or "Не указано"
-    object_address = user.data.get('object_address', "Не указано")
-    object_name = user.data.get('object_name', "Не указано")
+    object_info = user.data.get('object_info', "Не указано")
     
     text = f'''
 <b>Новая заявка: монтажная компания, дилер, без акта</b>
@@ -452,8 +448,7 @@ async def yes_dealer_done(message: Message, widget: TextInput, dialog_manager: D
 Номер телефона: {user.phone_number}
 Электронная почта: {user.email}
 
-Адрес объекта: {user.data['object_address']}
-Название объекта: {user.data['object_name']}
+Адрес и название объекта: {object_info}
 
 Марка и модель кондиционера: {brand}
 Что делали:
@@ -492,8 +487,7 @@ async def yes_dealer_done(message: Message, widget: TextInput, dialog_manager: D
 Номер телефона: {user.phone_number}
 Электронная почта: {user.email}
 
-Адрес объекта: {user.data['object_address']}
-Название объекта: {user.data['object_name']}
+Адрес и название объекта: {object_info}
 
 Марка и модель кондиционера: {brand}
 Что делали:
@@ -631,8 +625,7 @@ async def send_service_center_request(callback: CallbackQuery, button: Button, m
     fio = user.fio or "Не указано"
     phone_number = user.phone_number or "Не указано"
     email = user.email or "Не указано"
-    object_address = user.data.get('object_address', "Не указано")
-    object_name = user.data.get('object_name', "Не указано")
+    object_info = user.data.get('object_info', "Не указано")
 
     brand_input = manager.find('brand').get_value()
     if not brand_input:
@@ -647,8 +640,7 @@ async def send_service_center_request(callback: CallbackQuery, button: Button, m
 Номер телефона: {user.phone_number}
 Электронная почта: {user.email}
 
-Адрес объекта: {user.data['object_address']}
-Название объекта: {user.data['object_name']}
+Адрес и название объекта: {object_info}
 
 Марка/модель (которую искали): {brand_input}
 <i>Запрос: Модель не найдена в списке, требуется отправить запрос по рекламации в сервисный центр.</i>
@@ -721,8 +713,7 @@ async def no_message_handler(message: Message, message_input: MessageInput, mana
     fio = user.fio or "Не указано"
     phone_number = user.phone_number or "Не указано"
     email = user.email or "Не указано"
-    object_address = user.data.get('object_address', "Не указано")
-    object_name = user.data.get('object_name', "Не указано")
+    object_info = user.data.get('object_info', "Не указано")
     
     text = f'''
 <b>Новая заявка: монтажная компания, не дилер</b>
@@ -733,8 +724,7 @@ async def no_message_handler(message: Message, message_input: MessageInput, mana
 Номер телефона: {user.phone_number}
 Электронная почта: {user.email}
 
-Адрес объекта: {user.data['object_address']}
-Название объекта: {user.data['object_name']}
+Адрес и название объекта: {object_info}
 
 Марка и модель кондиционера: {conditioner_brand}
 <i>Обращение: {message.text}</i>
@@ -766,8 +756,7 @@ async def no_message_handler(message: Message, message_input: MessageInput, mana
 Номер телефона: {user.phone_number}
 Электронная почта: {user.email}
 
-Адрес объекта: {user.data['object_address']}
-Название объекта: {user.data['object_name']}
+Адрес и название объекта: {object_info}
 
 Марка и модель кондиционера: {conditioner_brand}
 <i>Обращение: {message.text}</i>
