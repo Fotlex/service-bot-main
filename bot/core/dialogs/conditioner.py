@@ -58,6 +58,12 @@ async def skip_barcode_handler(callback: CallbackQuery, button: Button, dialog_m
     dialog_manager.dialog_data['barcode'] = "Пропущено"  
     await dialog_manager.next()
 
+async def skip_object_handler(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
+    user = dialog_manager.middleware_data['user']
+    user.data['object_info'] = "Пропущено"
+    await user.asave()
+    
+    await dialog_manager.switch_to(CompanySG.choosing_myself)
 
 async def go_to_menu(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
     await dialog_manager.start(state=MainSG.main, mode=StartMode.RESET_STACK)
@@ -334,8 +340,7 @@ async def send_model_removed_company_request(message: Message, message_input: Me
     fio = user.fio or "Не указано"
     phone_number = user.phone_number or "Не указано"
     email = user.email or "Не указано"
-    object_address = user.data.get('object_address', "Не указано")
-    object_name = user.data.get('object_name', "Не указано")
+    object_info = user.data.get('object_info', "Не указано")
 
     text_to_manager = f'''
 <b>Новая заявка: Компания - Модель снята с производства</b>
@@ -344,8 +349,7 @@ async def send_model_removed_company_request(message: Message, message_input: Me
 ФИО: {fio}
 Номер телефона: {phone_number}
 Электронная почта: {email}
-Адрес объекта: {object_address}
-Название объекта: {object_name}
+Адрес и название объекта: {object_info}
 
 Дата покупки / Номер счета: {date_purchase}
 Указанная модель: {model_name_input}
@@ -431,8 +435,17 @@ company_dialog = Dialog(
         type_factory=validate_phone
     ),
     get_input_window(text='Укажите адрес электронной почты', id='email', state=CompanySG.email_input),
-    get_input_window(text='Укажите название объекта', id='object_name', state=CompanySG.object_name),
-    get_input_window(text='Укажите адрес объекта', id='object_address', state=CompanySG.object_address),
+    Window(
+        Const(text='Укажите адрес и название объекта'),
+        Row(
+            Back(text=Const('Назад')),
+            Button(text=Const('Пропустить'), id='skip_object', on_click=skip_object_handler),
+        ),
+        Button(text=Const('Назад в меню'), id='menu', on_click=go_to_menu),
+
+        TextInput(on_success=on_text_input_success, on_error=on_text_input_error, id='object_info'),
+        state=CompanySG.object_name 
+    ),
     Window(
         Const(text='Выберите'),
         Button(text=Const('Отправить запрос по рекламации в сервисный центр'), id='complaint',
@@ -523,7 +536,7 @@ company_dialog = Dialog(
         state=CompanySG.company_model_removed_model_name,
     ),
     Window(
-        Const('Если есть возможность, пришлите штрихкод или фото штрихкода. Выглядит он вот так (приложим пример штрих код).'),
+        Const('Если есть возможость пришлите номер штрихкода, фотографию штрихкода.'),
         Button(text=Const('Пропустить'), id='skip_company_model_removed_barcode', on_click=skip_barcode_handler), 
         Back(text=Const('Назад'), id='back_company_model_removed_barcode'),
         MessageInput(save_barcode_handler, content_types=(ContentType.TEXT, ContentType.PHOTO)),  

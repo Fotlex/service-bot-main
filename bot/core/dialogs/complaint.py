@@ -573,7 +573,7 @@ yes_dealer_dialog = Dialog(
         state=YesDealerSG.no,
     ),
     Window(
-        Const('Если есть возможность, пришлите штрихкод или фото штрихкода'),
+        Const('Если есть возможость пришлите номер штрихкода, фотографию штрихкода.'),
         Next(text=Const('Пропустить'), id='next'),
         Back(text=Const('Назад'), id='go_back'),
         MessageInput(Next(), id='code_image', content_types=ContentType.PHOTO),
