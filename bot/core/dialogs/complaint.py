@@ -307,7 +307,8 @@ async def ask_manager_for_reply(callback: CallbackQuery, dialog_manager: DialogM
     await dialog_manager.start(
         state=ManagerReplySG.text_input, 
         data={'user_id_to_reply': user_id, 'is_final_reply': is_final_reply,},
-        mode=StartMode.RESET_STACK
+        mode=StartMode.RESET_STACK,
+        show_mode=ShowMode.SEND
     )
     await callback.answer()
 
