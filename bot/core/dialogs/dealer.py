@@ -36,7 +36,7 @@ async def on_conditioner_choice(callback: CallbackQuery, button: Button, dialog_
 
 
 async def on_menu_choice(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
-    await dialog_manager.start(MainSG.main, mode=StartMode.RESET_STACK)
+    await dialog_manager.start(MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
 
 
 main_window = Window(
@@ -118,7 +118,7 @@ async def on_text_input_success(message: Message, widget: TextInput, dialog_mana
             print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24 (дилерство): {e}")
         
         await message.answer(text='Менеджер с вами свяжется в ближайшее время')
-        await dialog_manager.start(state=MainSG.main, mode=StartMode.RESET_STACK)
+        await dialog_manager.start(state=MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
         return
 
     await dialog_manager.next()

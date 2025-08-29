@@ -215,7 +215,7 @@ async def on_act(message: Message, widget, manager: DialogManager):
         print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24: {e}") 
     
     await message.answer(f"Ваш запрос в работе. Менеджер сервиса ответит вам в ближайшее время.")
-    await manager.start(state=MainSG.main)
+    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
 
 
 async def on_user_question(message: Message, message_input: MessageInput, manager: DialogManager):
@@ -226,7 +226,7 @@ async def on_user_question(message: Message, message_input: MessageInput, manage
 
     if not user.bitrix_lead_id:
         await message.answer("Извините, не могу найти связанный Лид для вашего вопроса. Пожалуйста, начните новую заявку.")
-        await manager.start(MainSG.main)
+        await manager.start(MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
         return
 
     try:
@@ -275,7 +275,7 @@ async def on_user_question(message: Message, message_input: MessageInput, manage
         print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при добавлении комментария пользователя в Битрикс24: {e}")
         await message.answer("Произошла непредвиденная ошибка. Попробуйте позже.")
 
-    await manager.start(MainSG.main)
+    await manager.start(MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
 
 
 
@@ -540,7 +540,7 @@ async def yes_dealer_done(message: Message, widget: TextInput, dialog_manager: D
     
     await message.answer(f"Ваш запрос в работе. Менеджер сервиса ответит вам в ближайшее время.")
 
-    await dialog_manager.start(state=MainSG.main, mode=StartMode.RESET_STACK)
+    await dialog_manager.start(state=MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
 
 
 yes_dealer_dialog = Dialog(
@@ -699,7 +699,7 @@ async def send_service_center_request(callback: CallbackQuery, button: Button, m
     except Exception as e:
         print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24 (запрос СЦ): {e}")
 
-    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK) 
+    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND) 
 
 
 async def no_message_handler(message: Message, message_input: MessageInput, manager: DialogManager):

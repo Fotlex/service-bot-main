@@ -66,7 +66,7 @@ async def skip_object_handler(callback: CallbackQuery, button: Button, dialog_ma
     await dialog_manager.switch_to(CompanySG.choosing_myself)
 
 async def go_to_menu(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
-    await dialog_manager.start(state=MainSG.main, mode=StartMode.RESET_STACK)
+    await dialog_manager.start(state=MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
 
 
 async def go_to_complaint(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
@@ -91,7 +91,7 @@ async def on_final_consumer(callback: CallbackQuery, button: Button, dialog_mana
 async def on_contact_myself(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
     await callback.message.answer("Спасибо за обращение в нашу компанию!")
     await callback.answer()
-    await dialog_manager.start(MainSG.main, mode=StartMode.RESET_STACK)
+    await dialog_manager.start(MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
 
 
 async def save_consumer_info_handler(message: Message, widget: TextInput, dialog_manager: DialogManager, text: str):
@@ -171,7 +171,7 @@ async def send_final_consumer_request(message: Message, message_input: MessageIn
     except Exception as e:
         print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24 (Конечный потребитель): {e}")
 
-    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK)
+    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
 
 
 
@@ -410,7 +410,7 @@ async def send_model_removed_company_request(message: Message, message_input: Me
     except Exception as e:
         print(f"!!! НЕПРЕДВИДЕННАЯ ОШИБКА при отправке Лида в Битрикс24 (запрос СЦ, Компания): {e}")
 
-    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK)
+    await manager.start(state=MainSG.main, mode=StartMode.RESET_STACK, show_mode=ShowMode.SEND)
 
 
 async def final_thanks_company(callback: CallbackQuery, button: Button, manager: DialogManager):
