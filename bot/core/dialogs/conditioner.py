@@ -143,6 +143,7 @@ async def send_final_consumer_request(message: Message, message_input: MessageIn
             "OPENED": "Y",
             "STATUS_ID": "NEW",
             "UF_CRM_1755788093": str(user.id),
+            "UF_CRM_1760933453": "Сервис"
         },
         "params": {"REGISTER_SONET_EVENT": "Y"}
     }
@@ -386,6 +387,7 @@ async def send_model_removed_company_request(message: Message, message_input: Me
             "OPENED": "Y",
             "STATUS_ID": "NEW",
             "UF_CRM_1755788093": str(user.id),
+            "UF_CRM_1760933453": "Сервис"
         },
         "params": {"REGISTER_SONET_EVENT": "Y"}
     }

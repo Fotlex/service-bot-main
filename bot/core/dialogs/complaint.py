@@ -501,6 +501,7 @@ async def yes_dealer_done(message: Message, widget: TextInput, dialog_manager: D
             "OPENED": "Y",
             "STATUS_ID": "NEW",
             "UF_CRM_1755788093": str(user.id),
+            "UF_CRM_1760933453": "Сервис"
         },
         "params": {"REGISTER_SONET_EVENT": "Y"}
     }
@@ -675,6 +676,7 @@ async def send_service_center_request(callback: CallbackQuery, button: Button, m
             "OPENED": "Y",
             "STATUS_ID": "NEW",
             "UF_CRM_1755788093": str(user.id),
+            "UF_CRM_1760933453": "Сервис"
         },
         "params": {"REGISTER_SONET_EVENT": "Y"}
     }
@@ -765,6 +767,7 @@ async def no_message_handler(message: Message, message_input: MessageInput, mana
             "OPENED": "Y",
             "STATUS_ID": "NEW",
             "UF_CRM_1755788093": str(user.id),
+            "UF_CRM_1760933453": "Сервис"
         },
         "params": {"REGISTER_SONET_EVENT": "Y"}
     }
