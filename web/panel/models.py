@@ -95,6 +95,9 @@ class ActualModel(models.Model):
 
     model = models.CharField('Модель кондиционера')
     type = models.CharField('Тип кондиционера', choices=types, default='byt')
+    
+    manual_user = models.FileField('Инструкция пользователя', upload_to='web/media/manuals/user', null=True, blank=True)
+    manual_install = models.FileField('Инструкция по монтажу', upload_to='web/media/manuals/install', null=True, blank=True)
 
     def __str__(self):
         return self.model

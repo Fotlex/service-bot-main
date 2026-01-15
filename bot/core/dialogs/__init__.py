@@ -5,6 +5,7 @@ from .complaint import router as complaint_router
 from .main import router as main_router
 from .dealer import router as dealer_router
 from .conditioner import router as conditioner_router
+from .manuals import router as manuals_router
 
 router = Router()
 router.include_routers(
@@ -12,6 +13,7 @@ router.include_routers(
     main_router,
     dealer_router,
     conditioner_router,
+    manuals_router,
 )
 
 setup_dialogs(router=router)

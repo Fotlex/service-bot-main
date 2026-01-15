@@ -40,7 +40,7 @@ async def on_menu_choice(callback: CallbackQuery, button: Button, dialog_manager
 
 
 main_window = Window(
-    Const(text='Стать дилером'),
+    Const(text='Хочу стать дилером'),
     Row(
         Button(text=Const('GREE'), id='GREE', on_click=on_conditioner_choice),
         Button(text=Const('KITANO'), id='KITANO', on_click=on_conditioner_choice),

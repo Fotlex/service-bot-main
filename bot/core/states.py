@@ -81,3 +81,13 @@ class FinalConsumerSG(StatesGroup):
     choice = State() 
     info_input = State() 
     barcode = State()
+
+
+class ManualsSG(StatesGroup):
+    brand = State()         
+    type = State()
+    model = State()
+    select_manual = State()
+    
+    input_date = State()
+    input_model = State()

@@ -55,7 +55,7 @@ clean:
 .PHONY: restart
 restart:
 	@echo "Restarting Docker containers for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) restart
+	@$(DOCKER_COMPOSE) restart web bot
 
 
 # --------------- BACKEND COMMANDS --------------- #
@@ -68,7 +68,7 @@ migrate:
 
 .PHONY: makemigrations
 makemigrations:
-	@$(DOCKER_COMPOSE) exec web python manage.py makemigrations $(APP)
+	@$(DOCKER_COMPOSE) exec web python manage.py makemigrations --noinput
 
 
 .PHONY: collectstatic
