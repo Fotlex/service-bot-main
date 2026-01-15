@@ -64,11 +64,11 @@ restart:
 .PHONY: migrate
 migrate:
 	@echo "Running migrations for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) exec web python manage.py migrate --noinput
+	@$(DOCKER_COMPOSE) exec web python web/manage.py migrate --noinput
 
 .PHONY: makemigrations
 makemigrations:
-	@$(DOCKER_COMPOSE) exec web python manage.py makemigrations --noinput
+	@$(DOCKER_COMPOSE) exec web python web/manage.py makemigrations --noinput
 
 
 .PHONY: collectstatic
