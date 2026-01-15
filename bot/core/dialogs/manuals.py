@@ -267,3 +267,5 @@ dialog = Dialog(
     win_date,
     win_input_model
 )
+
+router.include_router(dialog)
