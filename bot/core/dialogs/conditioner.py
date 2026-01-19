@@ -452,9 +452,9 @@ company_dialog = Dialog(
         Const(text='Выберите'),
         Button(text=Const('Отправить запрос по рекламации в сервисный центр'), id='complaint',
                on_click=go_to_complaint),
-        SwitchTo(text=Const('Справимся сами. Нужны коды ошибок.'), id='sami', state=CompanySG.by_myself),
+        SwitchTo(text=Const('Коды ошибок.'), id='sami', state=CompanySG.by_myself),
         Start(
-            text=Const('Нужны инструкции по оборудованию или по монтажу'), 
+            text=Const('Инструкции'), 
             id='manuals_btn', 
             state=ManualsSG.brand
         ),
