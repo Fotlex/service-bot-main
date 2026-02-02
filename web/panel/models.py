@@ -96,11 +96,12 @@ class ActualModel(models.Model):
     model = models.CharField('Модель кондиционера')
     type = models.CharField('Тип кондиционера', choices=types, default='byt')
     
-    manual_user = models.FileField('Инструкция пользователя', upload_to='web/media/manuals/user', null=True, blank=True)
-    manual_install = models.FileField('Инструкция по монтажу', upload_to='web/media/manuals/install', null=True, blank=True)
+    manual_user = models.FileField('Инструкция пользователя', upload_to='web/media/manuals/user', null=True, blank=True, editable=False)
+    manual_install = models.FileField('Инструкция по монтажу', upload_to='web/media/manuals/install', null=True, blank=True, editable=False)
 
     def __str__(self):
         return self.model
+
 
 
 class GreeModel(ActualModel):
@@ -119,6 +120,43 @@ class RoverModel(ActualModel):
     class Meta:
         verbose_name = 'Модель Rover'
         verbose_name_plural = 'Модели Rover'
+
+
+class GreeManual(models.Model):
+    model = models.ForeignKey(GreeModel, on_delete=models.CASCADE, related_name='manuals', verbose_name="Модель кондиционера")
+    title = models.CharField(max_length=255, verbose_name="Название инструкции")
+    file = models.FileField(upload_to='manuals/gree/', verbose_name="Файл инструкции")
+
+    class Meta:
+        verbose_name = "Инструкция Gree"
+        verbose_name_plural = "Инструкции Gree"
+
+    def __str__(self):
+        return self.title
+
+class KitanoManual(models.Model):
+    model = models.ForeignKey(KitanoModel, on_delete=models.CASCADE, related_name='manuals', verbose_name="Модель кондиционера")
+    title = models.CharField(max_length=255, verbose_name="Название инструкции")
+    file = models.FileField(upload_to='manuals/kitano/', verbose_name="Файл инструкции")
+
+    class Meta:
+        verbose_name = "Инструкция Kitano"
+        verbose_name_plural = "Инструкции Kitano"
+
+    def __str__(self):
+        return self.title
+
+class RoverManual(models.Model):
+    model = models.ForeignKey(RoverModel, on_delete=models.CASCADE, related_name='manuals', verbose_name="Модель кондиционера")
+    title = models.CharField(max_length=255, verbose_name="Название инструкции")
+    file = models.FileField(upload_to='manuals/rover/', verbose_name="Файл инструкции")
+
+    class Meta:
+        verbose_name = "Инструкция Rover"
+        verbose_name_plural = "Инструкции Rover"
+
+    def __str__(self):
+        return self.title
 
 
 class Attachments(models.Model):

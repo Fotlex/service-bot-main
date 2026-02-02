@@ -38,9 +38,22 @@ class GreeInline(admin.TabularInline):
     extra = 0
 
 
+class GreeManualInline(admin.TabularInline):
+    model = GreeManual
+    extra = 1
+
+class KitanoManualInline(admin.TabularInline):
+    model = KitanoManual
+    extra = 1
+
+class RoverManualInline(admin.TabularInline):
+    model = RoverManual
+    extra = 1
+
+
 @admin.register(GreeModel)
 class ConditionerAdmin(admin.ModelAdmin):
-    inlines = [GreeInline]
+    inlines = [GreeInline, GreeManualInline]
 
 
 class KitanoInline(admin.TabularInline):
@@ -51,7 +64,7 @@ class KitanoInline(admin.TabularInline):
 
 @admin.register(KitanoModel)
 class ConditionerAdmin(admin.ModelAdmin):
-    inlines = [KitanoInline]
+    inlines = [KitanoInline, KitanoManualInline]
 
 
 class RoverInline(admin.TabularInline):
@@ -62,9 +75,11 @@ class RoverInline(admin.TabularInline):
 
 @admin.register(RoverModel)
 class ConditionerAdmin(admin.ModelAdmin):
-    inlines = [RoverInline]
+    inlines = [RoverInline, RoverManualInline]
 
 
 @admin.register(Settings)
 class SettingsAdmin(SingletonModelAdmin):
     exclude = ('file_id',)
+    
+    
