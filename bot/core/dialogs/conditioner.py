@@ -186,7 +186,7 @@ main_window = Window(
 
 person_window = Window(
     Const(
-        'Если у вас не работает кондиционер, просим вас обратиться в компанию у которой вы приобретали оборудование.\n\nВсего наилучшего!'
+        'Если ваш кондиционер не работает, вы можете либо напрямую обратиться в компанию, у которой покупали оборудование, либо оставить заявку в нашем сервисе — и мы сами свяжемся с продавцом от вашего имени.'
     ),
     Next(text=Const('Назад')),
     Button(Const(text='Назад в меню'), id='menu', on_click=go_to_menu),
@@ -452,7 +452,7 @@ company_dialog = Dialog(
         Const(text='Выберите'),
         Button(text=Const('Отправить запрос по рекламации в сервисный центр'), id='complaint',
                on_click=go_to_complaint),
-        SwitchTo(text=Const('Коды ошибок.'), id='sami', state=CompanySG.by_myself),
+        SwitchTo(text=Const('Коды ошибок'), id='sami', state=CompanySG.by_myself),
         Start(
             text=Const('Инструкции'), 
             id='manuals_btn', 
@@ -492,7 +492,7 @@ company_dialog = Dialog(
                 id='s_buttons'
             ),
             id='scroll_models',
-            width=5, height=5, hide_on_single_page=True
+            width=1, height=7, hide_on_single_page=True
         ),
         Row(
             Back(text=Const('Назад'), id='back_cond_model'),
