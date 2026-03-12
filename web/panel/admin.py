@@ -54,6 +54,8 @@ class RoverManualInline(admin.TabularInline):
 @admin.register(GreeModel)
 class ConditionerAdmin(admin.ModelAdmin):
     inlines = [GreeInline, GreeManualInline]
+    
+    ordering = ('model',) 
 
 
 class KitanoInline(admin.TabularInline):
@@ -65,6 +67,8 @@ class KitanoInline(admin.TabularInline):
 @admin.register(KitanoModel)
 class ConditionerAdmin(admin.ModelAdmin):
     inlines = [KitanoInline, KitanoManualInline]
+    
+    ordering = ('model',) 
 
 
 class RoverInline(admin.TabularInline):
@@ -76,6 +80,8 @@ class RoverInline(admin.TabularInline):
 @admin.register(RoverModel)
 class ConditionerAdmin(admin.ModelAdmin):
     inlines = [RoverInline, RoverManualInline]
+    
+    ordering = ('model',) 
 
 
 @admin.register(Settings)
