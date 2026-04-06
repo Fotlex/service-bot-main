@@ -33,12 +33,12 @@ up-logs:
 
 .PHONY: logs
 logs:
-	@$(DOCKER_COMPOSE) logs -f
+	@$(DOCKER_COMPOSE) logs -f $(s)
 
 .PHONY: down
 down:
 	@echo "Stopping and removing Docker containers for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) down
+	@$(DOCKER_COMPOSE) down $(a)
 
 .PHONY: clean
 clean:
@@ -93,7 +93,7 @@ super_user:
 
 .PHONY: shell
 shell:
-	@$(DOCKER_COMPOSE) exec app bash
+	@$(DOCKER_COMPOSE) exec $(s) bash
 
 .PHONY: dbshell
 dbshell:

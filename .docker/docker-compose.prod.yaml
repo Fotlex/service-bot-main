@@ -37,6 +37,19 @@ services:
       - postgres
     restart: unless-stopped
 
+
+  maxbot:
+    build:
+      context: ../
+      dockerfile: .docker/default/Dockerfile
+    command: python maxbot/main.py
+    volumes:
+      - ..:/app
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+
   celery_worker:
     build:
       context: ../
@@ -60,7 +73,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres
+    image: postgres:17
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
