@@ -121,8 +121,13 @@ async def choose_cond_type(event: MessageCallback, context: MemoryContext, user:
     models = await sync_to_async(list)(model_class.objects.filter(type=c_type))
     
     builder = InlineKeyboardBuilder()
-    for m in models:
-        builder.row(CallbackButton(text=m.model, payload=f"model_{m.id}"))
+    chunk_size = 2
+    for i in range(0, len(models), chunk_size):
+        row_buttons = [
+            CallbackButton(text=m.model, payload=f"model_{m.id}")
+            for m in models[i:i + chunk_size]
+        ]
+        builder.row(*row_buttons)
     
     builder.row(CallbackButton(text="Нет нужной модели в списке", payload="not_found_model"))
     builder.row(CallbackButton(text="Назад", payload="company_by_myself"))
@@ -143,8 +148,13 @@ async def choose_model(event: MessageCallback, context: MemoryContext, user: Use
     error_codes = await sync_to_async(list)(model.error_codes.all())
     
     builder = InlineKeyboardBuilder()
-    for e in error_codes:
-        builder.row(CallbackButton(text=e.code, payload=f"err_{e.id}"))
+    chunk_size = 4
+    for i in range(0, len(error_codes), chunk_size):
+        row_buttons = [
+            CallbackButton(text=e.code, payload=f"err_{e.id}") 
+            for e in error_codes[i:i + chunk_size]
+        ]
+        builder.row(*row_buttons)
     builder.row(CallbackButton(text="Нет ошибки в списке", payload="not_found_error"))
     builder.row(CallbackButton(text="Назад", payload=f"type_{user.data['c_type']}"))
     

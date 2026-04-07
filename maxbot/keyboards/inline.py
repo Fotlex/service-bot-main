@@ -132,8 +132,13 @@ def get_conditioner_types_keyboard():
 
 def get_dynamic_models_keyboard(models_qs):
     builder = InlineKeyboardBuilder()
-    for m in models_qs:
-        builder.row(CallbackButton(text=m.model, payload=f"man_model_{m.id}"))
+    chunk_size = 2
+    for i in range(0, len(models_qs), chunk_size):
+        row_buttons = [
+            CallbackButton(text=m.model, payload=f"man_model_{m.id}")
+            for m in models_qs[i:i + chunk_size]
+        ]
+        builder.row(*row_buttons)
     builder.row(CallbackButton(text="Нет нужной модели в списке", payload="not_found_model"))
     builder.row(CallbackButton(text="Назад к брендам", payload="manuals_brand"))
     return builder.as_markup()
