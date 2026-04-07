@@ -8,14 +8,6 @@ from maxbot.keyboards.inline import get_main_keyboard
 router = Router()
 
 
-@router.bot_started()
-async def bot_started(event: BotStarted, bot: Bot):
-    text = await sync_to_async(AllText.objects.first)()
-    main_page_text = text.main_page if text else "Главное меню"
-    
-    await bot.send_message(chat_id=event.chat_id, text=main_page_text, attachments=[get_main_keyboard(text)])
-
-
 @router.message_created(Command('start'))
 async def start_handler(event: MessageCreated, context: MemoryContext):
     await context.clear()
