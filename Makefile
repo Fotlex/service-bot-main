@@ -55,7 +55,7 @@ clean:
 .PHONY: restart
 restart:
 	@echo "Restarting Docker containers for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) restart web bot
+	@$(DOCKER_COMPOSE) restart web bot maxbot
 
 
 # --------------- BACKEND COMMANDS --------------- #
