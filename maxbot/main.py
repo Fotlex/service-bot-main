@@ -28,7 +28,7 @@ dp = Dispatcher()
 
 @dp.bot_started()
 async def bot_started(event: BotStarted):
-    text = await AllText.objects.first()
+    text = await AllText.objects.afirst()
     main_page_text = text.main_page if text else "Главное меню"
     
     await bot.send_message(chat_id=event.chat_id, text=main_page_text, attachments=[get_main_keyboard(text)])
