@@ -44,7 +44,7 @@ async def yes_dealer_no(event: MessageCallback, context: MemoryContext):
     await event.message.answer("Укажите марку и модель кондиционера")
 
 @router.message_created(F.message.body, YesDealerSG.yes)
-async def on_act(event: MessageCreated, context: MemoryContext, user):
+async def on_act(event: MessageCreated, context: MemoryContext, user: User):
     settings = await sync_to_async(Settings.get_solo)()
     manager_id = settings.manager_id
     
@@ -153,7 +153,7 @@ async def diag_res_input(event: MessageCreated, context: MemoryContext):
 
 @router.message_created(F.message.body, YesDealerSG.error_code)
 @router.message_created(F.message.body, YesDealerSG.error_code1)
-async def error_code_input(event: MessageCreated, context: MemoryContext, user):
+async def error_code_input(event: MessageCreated, context: MemoryContext, user: User):
     err_code = event.message.body.text or "Фото"
     await context.update_data(error_code=err_code)
     data = await context.get_data()
@@ -184,7 +184,7 @@ async def no_dealer_brand(event: MessageCreated, context: MemoryContext):
     await event.message.answer("Отправьте ваш запрос техническому специалисту")
 
 @router.message_created(F.message.body.text, NoDealerSG.message)
-async def no_dealer_message(event: MessageCreated, context: MemoryContext, user):
+async def no_dealer_message(event: MessageCreated, context: MemoryContext, user: User):
     data = await context.get_data()
     conditioner_brand = data.get('conditioner_brand')
     settings = await sync_to_async(Settings.get_solo)()
@@ -250,7 +250,7 @@ async def process_ask_more(event: MessageCallback, context: MemoryContext):
     await event.message.answer("Пожалуйста, напишите ваш вопрос в сообщении ниже.")
 
 @router.message_callback(F.callback.payload == "reply_understood")
-async def process_understood(event: MessageCallback, context: MemoryContext, user):
+async def process_understood(event: MessageCallback, context: MemoryContext, user: User):
     if user.bitrix_lead_id:
         user.bitrix_lead_id = None
         await sync_to_async(user.save)()
@@ -258,7 +258,7 @@ async def process_understood(event: MessageCallback, context: MemoryContext, use
     await context.set_state(ConditionerSG.main)
 
 @router.message_created(F.message.body.text, QuestionSG.question_text)
-async def on_user_question(event: MessageCreated, context: MemoryContext, user):
+async def on_user_question(event: MessageCreated, context: MemoryContext, user: User):
     settings = await sync_to_async(Settings.get_solo)()
     question = event.message.body.text
     
