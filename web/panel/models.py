@@ -6,6 +6,7 @@ from solo.models import SingletonModel
 
 class Settings(SingletonModel):
     manager_id = models.BigIntegerField('Телеграм ID менеджера', null=True, blank=True)
+    max_id = models.BigIntegerField('MAX id менеджера', null=True, blank=True)
     act = models.FileField('Акт о неисправности', upload_to='web/media/acts', null=True, blank=True)
     file_id = models.CharField(null=True, blank=True)
 

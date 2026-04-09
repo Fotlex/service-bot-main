@@ -46,7 +46,7 @@ async def yes_dealer_no(event: MessageCallback, context: MemoryContext):
 @router.message_created(F.message.body, YesDealerSG.yes)
 async def on_act(event: MessageCreated, context: MemoryContext, user: User):
     settings = await sync_to_async(Settings.get_solo)()
-    manager_id = settings.manager_id
+    manager_id = settings.max_id
     
     text = f'''<b>Новая заявка: монтажная компания, дилер, акт</b>
 Название компании: {user.company_name}
@@ -159,7 +159,7 @@ async def error_code_input(event: MessageCreated, context: MemoryContext, user: 
     data = await context.get_data()
     
     settings = await sync_to_async(Settings.get_solo)()
-    manager_id = settings.manager_id
+    manager_id = settings.max_id
 
     text = f'''<b>Новая заявка: монтажная компания, дилер, без акта</b>
 Марка и модель кондиционера: {data.get('brand')}
@@ -193,9 +193,9 @@ async def no_dealer_message(event: MessageCreated, context: MemoryContext, user:
 Марка: {conditioner_brand}
 Обращение: {event.message.body.text}'''
 
-    if settings.manager_id and settings.manager_id != -1:
+    if settings.max_id and settings.max_id != -1:
         await event.bot.send_message(
-            chat_id=settings.manager_id,
+            chat_id=settings.max_id,
             text=text,
             attachments=[get_manager_reply_kb(user.id, is_final=True)]
         )
@@ -262,9 +262,9 @@ async def on_user_question(event: MessageCreated, context: MemoryContext, user: 
     settings = await sync_to_async(Settings.get_solo)()
     question = event.message.body.text
     
-    if settings.manager_id and settings.manager_id != -1:
+    if settings.max_id and settings.max_id != -1:
         await event.bot.send_message(
-            chat_id=settings.manager_id,
+            chat_id=settings.max_id,
             text=f"Новый вопрос от пользователя (ID:{user.id})\n\nВопрос: {question}",
             attachments=[get_manager_reply_kb(user.id)]
         )
