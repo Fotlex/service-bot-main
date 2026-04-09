@@ -179,7 +179,7 @@ async def finalize_dealer_complaint(event, context: MemoryContext, user: User):
     data = await context.get_data()
     
     settings = await sync_to_async(Settings.get_solo)()
-    manager_id = settings.manager_id
+    manager_id = settings.max_id
 
     brand = data.get('brand', 'Не указано')
     what_do = data.get('what_do', 'Не указано')

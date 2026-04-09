@@ -242,14 +242,14 @@ async def handle_final_consumer(event: MessageCreated, context: MemoryContext, u
 Данные о штрихкоде: {barcode_text}'''
     
     settings = await sync_to_async(Settings.get_solo)()
-    if settings.manager_id and settings.manager_id != -1:
+    if settings.max_id and settings.max_id != -1:
         try:
             await event.bot.send_message(
-                chat_id=settings.manager_id,
+                chat_id=settings.max_id,
                 text=text_to_manager
             )
         except Exception as e:
-            print(f"Ошибка отправки сообщения менеджеру {settings.manager_id}: {e}")
+            print(f"Ошибка отправки сообщения менеджеру {settings.max_id}: {e}")
 
     bitrix_payload = {
         "fields": {
