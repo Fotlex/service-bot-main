@@ -9,7 +9,7 @@ from maxapi.context import MemoryContext
 from maxbot.states import ComplaintSG, YesDealerSG, NoDealerSG, MainSG, ConditionerSG, ManagerReplySG, QuestionSG
 from maxbot.keyboards.inline import (
     get_complaint_main_kb, get_yes_dealer_main_kb, get_back_menu_kb, get_skip_barcode_kb, 
-    get_yes_no_diagnostic_kb, get_manager_reply_kb, get_user_reply_kb
+    get_yes_no_diagnostic_kb, get_manager_reply_kb, get_user_reply_kb, get_confirm_data_kb
 )
 from config import config
 from web.panel.models import Settings, User
@@ -156,27 +156,86 @@ async def diag_res_input(event: MessageCreated, context: MemoryContext):
 async def error_code_input(event: MessageCreated, context: MemoryContext, user: User):
     err_code = event.message.body.text or "Фото"
     await context.update_data(error_code=err_code)
+    
+    await context.set_state(YesDealerSG.confirm_data)
+    await event.message.answer("Вы указали все запрашиваемые данные?", attachments=[get_confirm_data_kb()])
+
+@router.message_callback(F.callback.payload == 'confirm_data_no')
+async def confirm_data_no(event: MessageCallback, context: MemoryContext):
+    await context.set_state(YesDealerSG.waiting_additional_data)
+    await event.message.answer("Пожалуйста, укажите все запрашиваемые данные. Если вы заполнили не все данные, мы не сможем с вами связаться.")
+
+@router.message_created(F.message.body, YesDealerSG.waiting_additional_data)
+async def additional_data_input(event: MessageCreated, context: MemoryContext, user: User):
+    additional = event.message.body.text or "Фото/Файл"
+    await context.update_data(additional_data=additional)
+    await finalize_dealer_complaint(event, context, user)
+
+@router.message_callback(F.callback.payload == 'confirm_data_yes')
+async def confirm_data_yes(event: MessageCallback, context: MemoryContext, user: User):
+    await finalize_dealer_complaint(event, context, user)
+
+async def finalize_dealer_complaint(event, context: MemoryContext, user: User):
     data = await context.get_data()
     
     settings = await sync_to_async(Settings.get_solo)()
-    manager_id = settings.max_id
+    manager_id = settings.manager_id
+
+    brand = data.get('brand', 'Не указано')
+    what_do = data.get('what_do', 'Не указано')
+    diagnostic_results = data.get('diagnostic_results', 'Не указано')
+    error_code = data.get('error_code', 'Не указано')
+    additional_data = data.get('additional_data', '')
 
     text = f'''<b>Новая заявка: монтажная компания, дилер, без акта</b>
-Марка и модель кондиционера: {data.get('brand')}
-Что делали: {data.get('what_do')}
-Результаты диагностики: {data.get('diagnostic_results')}
-Код ошибки: {err_code}'''
+Марка и модель кондиционера: {brand}
+Что делали: {what_do}
+Результаты диагностики: {diagnostic_results}
+Код ошибки: {error_code}'''
+
+    if additional_data:
+        text += f"\nДополнительная информация: {additional_data}"
 
     if manager_id and manager_id != -1:
-        await event.bot.send_message(
-            chat_id=manager_id,
-            text=text,
-            attachments=[get_manager_reply_kb(user.id)]
-        )
+        try:
+            await event.bot.send_message(
+                chat_id=manager_id,
+                text=text,
+                attachments=[get_manager_reply_kb(user.id)]
+            )
+        except Exception as e:
+            print(f"Ошибка отправки сообщения менеджеру {manager_id}: {e}")
     
+    bitrix_payload = {
+        "fields": {
+            "TITLE": f"Заявка из MAX (Без акта): {user.company_name or user.fio or 'Дилер'}",
+            "NAME": user.fio or "Не указано",
+            "COMPANY_TITLE": user.company_name or "",
+            "PHONE": [{"VALUE": user.phone_number or "", "VALUE_TYPE": "WORK"}],
+            "COMMENTS": text,
+            "OPENED": "Y",
+            "STATUS_ID": "NEW",
+            "UF_CRM_1755788093": str(user.id),
+            "UF_CRM_1760933453": "Сервис"
+        },
+        "params": {"REGISTER_SONET_EVENT": "Y"}
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = config.BITRIX24_WEBHOOK_URL + "crm.lead.add.json"
+            async with session.post(url, json=bitrix_payload) as response:
+                res = await response.json()
+                if res.get('result'):
+                    user.bitrix_lead_id = res['result']
+                    await sync_to_async(user.save)()
+    except Exception as e:
+        print(f"Ошибка Bitrix24 (Без акта): {e}")
+
     await event.message.answer("Ваш запрос в работе. Менеджер сервиса ответит вам в ближайшее время.")
     await context.set_state(ConditionerSG.main)
-
+    
+    
 @router.message_created(F.message.body.text, NoDealerSG.main)
 async def no_dealer_brand(event: MessageCreated, context: MemoryContext):
     await context.update_data(conditioner_brand=event.message.body.text)

@@ -21,6 +21,8 @@ class YesDealerSG(StatesGroup):
     what_do = State()
     diagnostic_results = State()
     error_code1 = State()
+    confirm_data = State() 
+    waiting_additional_data = State()
 
 class NoDealerSG(StatesGroup):
     main = State()
@@ -40,7 +42,6 @@ class CompanySG(StatesGroup):
     error_code = State()
     ask_for_more_errors = State()
     
-    # --- НОВЫЕ СОСТОЯНИЯ ДЛЯ ОТСУТСТВУЮЩЕЙ МОДЕЛИ ---
     missing_date = State()
     missing_model = State()
     missing_barcode = State()
@@ -48,6 +49,9 @@ class CompanySG(StatesGroup):
     
 class FinalConsumerSG(StatesGroup):
     choice = State()
+    contact_info = State()
+    barcode = State()
+    
 
 class ManagerReplySG(StatesGroup):
     text_input = State()

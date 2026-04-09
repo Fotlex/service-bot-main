@@ -11,7 +11,7 @@ from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
 from maxbot.states import ConditionerSG, CompanySG, FinalConsumerSG, MainSG
 from maxbot.keyboards.inline import (
     get_conditioner_main_kb, get_company_choosing_kb, get_skip_object_kb, get_back_menu_kb,
-    get_brands_kb, get_cond_type_kb, get_skip_or_menu_kb
+    get_brands_kb, get_cond_type_kb, get_skip_or_menu_kb, get_final_consumer_choice_kb
 )
 from config import config
 
@@ -33,10 +33,6 @@ async def role_company(event: MessageCallback, context: MemoryContext, user: Use
         await context.set_state(CompanySG.main)
         await event.message.answer("Укажите название компании", attachments=[get_back_menu_kb()])
 
-@router.message_callback(F.callback.payload == 'role_final_consumer')
-async def role_final_consumer(event: MessageCallback, context: MemoryContext):
-    await context.set_state(FinalConsumerSG.choice)
-    await event.message.answer("Контактные данные (ФИО, телефон, email) или фото штрихкода (для связи с компанией, у которой покупали):", attachments=[get_back_menu_kb()])
 
 @router.message_created(F.message.body.text, CompanySG.main)
 async def company_name_input(event: MessageCreated, context: MemoryContext, user: User):
@@ -186,9 +182,42 @@ async def choose_err_code(event: MessageCallback, context: MemoryContext, user: 
     await event.message.answer("Если есть еще вопросы, вернитесь в главное меню", attachments=[builder.as_markup()])
 
 
-@router.message_created(F.message.body, FinalConsumerSG.choice)
+@router.message_callback(F.callback.payload == 'role_final_consumer')
+async def role_final_consumer(event: MessageCallback, context: MemoryContext):
+    text = (
+        "Если ваш кондиционер не работает, вы можете либо напрямую обратиться в компанию, "
+        "у которой покупали оборудование, либо оставить заявку в нашем сервисе — "
+        "и мы сами свяжемся с продавцом от вашего имени."
+    )
+    await event.message.answer(text, attachments=[get_final_consumer_choice_kb()])
+
+@router.message_callback(F.callback.payload == 'fc_contact_myself')
+async def fc_contact_myself(event: MessageCallback, context: MemoryContext):
+    await event.message.answer("Спасибо за обращение в нашу компанию.", attachments=[get_back_menu_kb()])
+    await context.set_state(ConditionerSG.main)
+
+@router.message_callback(F.callback.payload == 'fc_leave_request')
+async def fc_leave_request(event: MessageCallback, context: MemoryContext):
+    await context.set_state(FinalConsumerSG.contact_info)
+    await event.message.answer(
+        "Укажите ваше ФИО, номер телефона для связи и адрес электронной почты.", 
+        attachments=[get_back_menu_kb()]
+    )
+
+@router.message_created(F.message.body, FinalConsumerSG.contact_info)
+async def fc_contact_info_input(event: MessageCreated, context: MemoryContext):
+    await context.update_data(contact_info=event.message.body.text)
+    await context.set_state(FinalConsumerSG.barcode)
+    await event.message.answer(
+        "Пожалуйста, приложите фотографию штрихкода с оборудования, которое вышло из строя", 
+        attachments=[get_back_menu_kb()]
+    )
+
+@router.message_created(F.message.body, FinalConsumerSG.barcode)
 async def handle_final_consumer(event: MessageCreated, context: MemoryContext, user: User):
-    consumer_info = event.message.body.text or "Не указано"
+    data = await context.get_data()
+    consumer_info = data.get('contact_info', 'Не указано')
+    barcode_text = event.message.body.text or "Фото/штрихкод прикреплен"
     
     file_for_bitrix = None
     if event.message.body.attachments:
@@ -205,12 +234,23 @@ async def handle_final_consumer(event: MessageCreated, context: MemoryContext, u
             except Exception as e:
                 print(f"Error fetching MAX media file: {e}")
 
-    fio_for_title = consumer_info.split(',')[0].strip() or "Не указано"
+    fio_for_title = consumer_info.split(',')[0].split('\n')[0].strip() or "Не указано"
+    
     text_to_manager = f'''<b>Новая заявка: Конечный потребитель</b>
 Контактные данные:
 {consumer_info}
-Запрос: Пользователь оставил заявку...'''
+Данные о штрихкоде: {barcode_text}'''
     
+    settings = await sync_to_async(Settings.get_solo)()
+    if settings.manager_id and settings.manager_id != -1:
+        try:
+            await event.bot.send_message(
+                chat_id=settings.manager_id,
+                text=text_to_manager
+            )
+        except Exception as e:
+            print(f"Ошибка отправки сообщения менеджеру {settings.manager_id}: {e}")
+
     bitrix_payload = {
         "fields": {
             "TITLE": f"Заявка от Конечного потребителя: {fio_for_title}",
@@ -235,11 +275,10 @@ async def handle_final_consumer(event: MessageCreated, context: MemoryContext, u
                     user.bitrix_lead_id = res['result']
                     await sync_to_async(user.save)()
     except Exception as e:
-        print(e)
+        print(f"Ошибка Bitrix (Конечный потребитель): {e}")
         
     await event.message.answer("Спасибо за обращение в нашу компанию, ваша заявка будет передана в ближайшее время.", attachments=[get_back_menu_kb()])
-    await context.set_state(ConditionerSG.main)
-    
+    await context.set_state(ConditionerSG.main)    
 
 
 async def send_missing_model_to_bitrix(user: User):

@@ -152,3 +152,18 @@ def get_manuals_list_keyboard(manuals_list):
     builder.row(CallbackButton(text="Нет нужной инструкции", payload="not_found_manual"))
     builder.row(CallbackButton(text="Назад в меню", payload="main_menu"))
     return builder.as_markup()
+
+
+def get_confirm_data_kb():
+    builder = InlineKeyboardBuilder()
+    builder.row(CallbackButton(text='ДА', payload='confirm_data_yes'))
+    builder.row(CallbackButton(text='НЕТ', payload='confirm_data_no'))
+    return builder.as_markup()
+
+
+def get_final_consumer_choice_kb():
+    builder = InlineKeyboardBuilder()
+    builder.row(CallbackButton(text='Свяжусь сам', payload='fc_contact_myself'))
+    builder.row(CallbackButton(text='Оставлю заявку вам', payload='fc_leave_request'))
+    builder.row(CallbackButton(text='Назад в меню', payload='main_menu'))
+    return builder.as_markup()
