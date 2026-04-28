@@ -194,7 +194,7 @@ async def send_manual_request_to_bitrix(user: User, brand: str, model_input: str
             "NAME": fio.split()[0] if fio and len(fio.split()) > 0 else "Пользователь",
             "COMPANY_TITLE": company,
             "PHONE": [{"VALUE": phone, "VALUE_TYPE": "WORK"}],
-            "SOURCE_ID": "TELEGRAM",
+            "SOURCE_ID": "MAX",
             "COMMENTS": comment,
             "OPENED": "Y",
             "STATUS_ID": "NEW",

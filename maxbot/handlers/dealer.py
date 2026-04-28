@@ -147,7 +147,7 @@ async def send_to_bitrix(user: User):
             "LAST_NAME": fio.split()[-1] if fio and len(fio.split()) > 1 else "",
             "COMPANY_TITLE": company_name,
             "PHONE": [{"VALUE": phone_number, "VALUE_TYPE": "WORK"}],
-            "SOURCE_ID": "TELEGRAM", 
+            "SOURCE_ID": "MAX",
             "COMMENTS": comments_for_bitrix,
             "OPENED": "Y",
             "STATUS_ID": "NEW",
