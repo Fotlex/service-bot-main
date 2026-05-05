@@ -85,6 +85,7 @@ async def on_act(event: MessageCreated, context: MemoryContext, user: User):
             "OPENED": "Y",
             "STATUS_ID": "NEW",
             "UF_CRM_1755788093": str(user.id),
+            "UF_CRM_1760933453": "Дилер",
         },
         "params": {"REGISTER_SONET_EVENT": "Y"}
     }
